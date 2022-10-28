@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ops::Deref};
+use std::{collections::HashMap, hash, ops::Deref};
 
 /*
 * - the actions that mutate the map, are the potential clients for implementing those methods.
@@ -16,18 +16,27 @@ use std::{collections::HashMap, ops::Deref};
 *         will need to check if the key exists in the under lying map or not.
 * */
 
-pub struct OrderedMap {
-    inner: HashMap<String, i32>,
-    ordered_keys: Vec<String>,
+pub struct OrderedMap<K, V>
+where
+    K: Eq + hash::Hash + Clone,
+{
+    inner: HashMap<K, V>,
+    ordered_keys: Vec<K>,
 }
 
-pub struct OrderedMapIter<'a> {
-    map: &'a OrderedMap,
-    remainder_keys: &'a [String],
+pub struct OrderedMapIter<'a, K, V>
+where
+    K: Eq + hash::Hash + Clone,
+{
+    map: &'a OrderedMap<K, V>,
+    remainder_keys: &'a [K],
 }
 
-impl<'a> Iterator for OrderedMapIter<'a> {
-    type Item = &'a i32;
+impl<'a, K, V> Iterator for OrderedMapIter<'a, K, V>
+where
+    K: Eq + hash::Hash + Clone,
+{
+    type Item = &'a V;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.remainder_keys.is_empty() {
@@ -43,50 +52,57 @@ impl<'a> Iterator for OrderedMapIter<'a> {
         None
     }
 }
-impl Deref for OrderedMap {
-    type Target = HashMap<String, i32>;
+impl<K, V> Deref for OrderedMap<K, V>
+where
+    K: Eq + hash::Hash + Clone,
+{
+    type Target = HashMap<K, V>;
 
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
 }
 
-impl OrderedMap {
+impl<'a, K, V> OrderedMap<K, V>
+where
+    K: Eq + hash::Hash + Clone,
+{
     pub fn new() -> Self {
         OrderedMap {
             inner: HashMap::new(),
             ordered_keys: Vec::new(),
         }
     }
-    pub fn iter(&self) -> OrderedMapIter {
+    pub fn iter(&'a self) -> OrderedMapIter<'a, K, V> {
         OrderedMapIter {
             map: self,
             remainder_keys: &self.ordered_keys[..],
         }
     }
 
-    pub fn insert(&mut self, key: &str, value: i32) -> Option<i32> {
-        if !self.inner.contains_key(key) {
+    pub fn insert(&mut self, key: K, value: V) -> Option<V> {
+        if !self.inner.contains_key(&key) {
             self.ordered_keys.push(key.to_owned());
         }
         return self.inner.insert(key.to_owned(), value);
     }
 
-    pub fn remove(&mut self, key: &str) -> Option<i32> {
-        self.inner.remove(key)
+    pub fn remove(&mut self, key: K) -> Option<V> {
+        self.inner.remove(&key)
     }
 }
 
 #[test]
 fn it_works() {
-    let map = OrderedMap::new();
+    let map: OrderedMap<String, i32> = OrderedMap::new();
     assert_eq!(map.iter().next(), None);
 }
 #[test]
 fn it_works_deletion_with_no_element() {
-    let mut map = OrderedMap::new();
-    map.remove("somename");
-    assert_eq!(map.iter().next(), None);
+    // let mut map = OrderedMap::new();
+    // let map: OrderedMap<String, i32> = OrderedMap::new();
+    // map.remove("somename");
+    // assert_eq!(map.iter().next(), None);
 }
 
 #[test]
