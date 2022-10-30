@@ -40,7 +40,7 @@ impl<'a, K, V> Iterator for OrderedMapIter<'a, K, V>
 where
     K: Eq + Hash + Clone,
 {
-    type Item = &'a V;
+    type Item = (&'a K, &'a V);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.remainder_keys.is_empty() {
@@ -50,7 +50,7 @@ where
         while let Some(key) = self.remainder_keys.first() {
             self.remainder_keys = &self.remainder_keys[1..self.remainder_keys.len()];
             if self.map.deref().contains_key(key) {
-                return self.map.deref().get(key);
+                return Some((key, self.map.deref().get(key).unwrap()));
             }
         }
         None
@@ -117,7 +117,7 @@ fn it_works_for_one_element() {
     let mut map = OrderedMap::new();
     map.insert("name", 4);
     let mut iterator = map.iter();
-    assert_eq!(*iterator.next().unwrap(), 4);
+    assert_eq!(*(iterator.next().unwrap().1), 4);
     assert_eq!(iterator.next(), None);
 }
 #[test]
@@ -125,7 +125,7 @@ fn it_works_for_one_element_with_int_key() {
     let mut map = OrderedMap::new();
     map.insert(1, 4);
     let mut iterator = map.iter();
-    assert_eq!(*iterator.next().unwrap(), 4);
+    assert_eq!(*(iterator.next().unwrap().1), 4);
     assert_eq!(iterator.next(), None);
 }
 
@@ -135,8 +135,8 @@ fn it_works_for_two_element() {
     map.insert("name", 4);
     map.insert("kumarmo2", 5);
     let mut iterator = map.iter();
-    assert_eq!(*iterator.next().unwrap(), 4);
-    assert_eq!(*iterator.next().unwrap(), 5);
+    assert_eq!(*(iterator.next().unwrap().1), 4);
+    assert_eq!(*(iterator.next().unwrap().1), 5);
     assert_eq!(iterator.next(), None);
 }
 
@@ -147,7 +147,7 @@ fn simple_deletion() {
     map.insert("kumarmo2", 5);
     map.remove("name");
     let mut iterator = map.iter();
-    assert_eq!(*iterator.next().unwrap(), 5);
+    assert_eq!(*(iterator.next().unwrap().1), 5);
     assert_eq!(iterator.next(), None);
 }
 
@@ -159,8 +159,8 @@ fn deletion_at_end() {
     map.insert("kumarmo2", 5);
     map.remove("kumarmo2");
     let mut iterator = map.iter();
-    assert_eq!(*iterator.next().unwrap(), 4);
-    assert_eq!(*iterator.next().unwrap(), 10);
+    assert_eq!(*(iterator.next().unwrap().1), 4);
+    assert_eq!(*(iterator.next().unwrap().1), 10);
     assert_eq!(iterator.next(), None);
 }
 
@@ -172,8 +172,8 @@ fn deletion_at_middle() {
     map.insert("kumarmo2", 5);
     map.remove("name2");
     let mut iterator = map.iter();
-    assert_eq!(*iterator.next().unwrap(), 4);
-    assert_eq!(*iterator.next().unwrap(), 5);
+    assert_eq!(*(iterator.next().unwrap().1), 4);
+    assert_eq!(*(iterator.next().unwrap().1), 5);
     assert_eq!(iterator.next(), None);
 }
 
@@ -185,8 +185,43 @@ fn it_works_for_updating_key() {
     map.insert("kumarmo2", 5);
     map.insert("name2", 10);
     let mut iterator = map.iter();
-    assert_eq!(*iterator.next().unwrap(), 4);
-    assert_eq!(*iterator.next().unwrap(), 10);
-    assert_eq!(*iterator.next().unwrap(), 5);
+    assert_eq!(*(iterator.next().unwrap().1), 4);
+    assert_eq!(*(iterator.next().unwrap().1), 10);
+    assert_eq!(*(iterator.next().unwrap().1), 5);
     assert_eq!(iterator.next(), None);
+}
+
+#[test]
+fn simple_iteration_works() {
+    let mut map = OrderedMap::new();
+    map.insert(1, 1);
+    map.insert(2, 2);
+    map.insert(3, 3);
+    map.insert(4, 4);
+    let mut iterator = map.iter();
+    let tuple = iterator.next().unwrap();
+    assert_eq!((*tuple.0, *tuple.1), (1, 1));
+    let tuple = iterator.next().unwrap();
+    assert_eq!((*tuple.0, *tuple.1), (2, 2));
+    let tuple = iterator.next().unwrap();
+    assert_eq!((*tuple.0, *tuple.1), (3, 3));
+    let tuple = iterator.next().unwrap();
+    assert_eq!((*tuple.0, *tuple.1), (4, 4));
+}
+#[test]
+fn iteration_works_with_deletion() {
+    let mut map = OrderedMap::new();
+    map.insert(1, 1);
+    map.insert(2, 2);
+    map.insert(3, 3);
+    map.insert(4, 4);
+    map.remove(&2);
+    map.remove(&3);
+    let mut iterator = map.iter();
+    let tuple = iterator.next().unwrap();
+    assert_eq!((*tuple.0, *tuple.1), (1, 1));
+    // assert_eq!((*tuple.0, *tuple.1), (2, 2));
+    // assert_eq!((*tuple.0, *tuple.1), (3, 3));
+    let tuple = iterator.next().unwrap();
+    assert_eq!((*tuple.0, *tuple.1), (4, 4));
 }
