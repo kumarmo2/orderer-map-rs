@@ -1,4 +1,4 @@
-use std::{collections::HashMap, hash, ops::Deref};
+use std::{borrow::Borrow, collections::HashMap, hash::Hash, ops::Deref};
 
 /*
 * - the actions that mutate the map, are the potential clients for implementing those methods.
@@ -18,15 +18,19 @@ use std::{collections::HashMap, hash, ops::Deref};
 
 pub struct OrderedMap<K, V>
 where
-    K: Eq + hash::Hash + Clone,
+    K: Eq + Hash + Clone,
 {
+    // I am keeping Clone trait for now, because If I don't keep the clone trait, and the `inner`
+    // map  is the owner of tke key, then ordered_keys will need to be a reference to the `inner`,
+    // which would make this OrderedMap a self-referential struct, which is not possible as of
+    // today in safe rust.
     inner: HashMap<K, V>,
     ordered_keys: Vec<K>,
 }
 
 pub struct OrderedMapIter<'a, K, V>
 where
-    K: Eq + hash::Hash + Clone,
+    K: Eq + Hash + Clone,
 {
     map: &'a OrderedMap<K, V>,
     remainder_keys: &'a [K],
@@ -34,7 +38,7 @@ where
 
 impl<'a, K, V> Iterator for OrderedMapIter<'a, K, V>
 where
-    K: Eq + hash::Hash + Clone,
+    K: Eq + Hash + Clone,
 {
     type Item = &'a V;
 
@@ -54,7 +58,7 @@ where
 }
 impl<K, V> Deref for OrderedMap<K, V>
 where
-    K: Eq + hash::Hash + Clone,
+    K: Eq + Hash + Clone,
 {
     type Target = HashMap<K, V>;
 
@@ -65,7 +69,7 @@ where
 
 impl<'a, K, V> OrderedMap<K, V>
 where
-    K: Eq + hash::Hash + Clone,
+    K: Eq + Hash + Clone,
 {
     pub fn new() -> Self {
         OrderedMap {
@@ -87,8 +91,12 @@ where
         return self.inner.insert(key.to_owned(), value);
     }
 
-    pub fn remove(&mut self, key: K) -> Option<V> {
-        self.inner.remove(&key)
+    pub fn remove<Q>(&mut self, key: &Q) -> Option<V>
+    where
+        K: Borrow<Q>,
+        Q: Eq + Hash + ?Sized,
+    {
+        self.inner.remove(key)
     }
 }
 
@@ -99,16 +107,23 @@ fn it_works() {
 }
 #[test]
 fn it_works_deletion_with_no_element() {
-    // let mut map = OrderedMap::new();
-    // let map: OrderedMap<String, i32> = OrderedMap::new();
-    // map.remove("somename");
-    // assert_eq!(map.iter().next(), None);
+    let mut map: OrderedMap<String, i32> = OrderedMap::new();
+    map.remove("somename");
+    assert_eq!(map.iter().next(), None);
 }
 
 #[test]
 fn it_works_for_one_element() {
     let mut map = OrderedMap::new();
     map.insert("name", 4);
+    let mut iterator = map.iter();
+    assert_eq!(*iterator.next().unwrap(), 4);
+    assert_eq!(iterator.next(), None);
+}
+#[test]
+fn it_works_for_one_element_with_int_key() {
+    let mut map = OrderedMap::new();
+    map.insert(1, 4);
     let mut iterator = map.iter();
     assert_eq!(*iterator.next().unwrap(), 4);
     assert_eq!(iterator.next(), None);
